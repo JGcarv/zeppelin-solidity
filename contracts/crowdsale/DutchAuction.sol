@@ -1,8 +1,8 @@
-pragma solidity ^0.4.14;
+pragma solidity ^0.4.11;
 
 import '../token/MintableToken.sol';
 import '../math/SafeMath.sol';
-import '../ownership/Ownable.sol'
+import '../ownership/Ownable.sol';
 
 /**
  * @title DutchAuction
@@ -20,19 +20,19 @@ import '../ownership/Ownable.sol'
      MintableToken public token;
      address public wallet;
      uint public ceiling;
-     uint public priceFactor;
-     uint public startBlock;
-     uint public endBlock;
+     uint public rateFactor;
+     uint public startTime;
+     uint public endTime;
      uint public totalReceived;
      uint public finalPrice;
+
      mapping (address => uint) public bids;
      Stages public stage;
 
      enum Stages {
          AuctionDeployed,
          AuctionStarted,
-         AuctionEnded,
-         TradingStarted
+         AuctionEnded
      }
 
      /*
@@ -47,7 +47,8 @@ import '../ownership/Ownable.sol'
 
      modifier validPurchase() {
        require(msg.value > 0);
-       require(block.number >= startBlock && block.number <= endBlock)
+       require(block.timestamp >= startTime && block.timestamp <= endTime);
+       _;
      }
 
 
@@ -57,21 +58,22 @@ import '../ownership/Ownable.sol'
      /// @dev Contract constructor function sets owner
      /// @param _wallet address Destination wallet
      /// @param _ceiling uint Auction ceiling
-     /// @param _priceFactor uint Auction price factor
-     function DutchAuction(address _wallet, uint _ceiling, uint _priceFactor)
+     /// @param _rateFactor uint Auction price factor
+     function DutchAuction(address _wallet, uint _ceiling, uint _rateFactor, uint _startTime, uint _endTime)
          public
      {
-         if (_wallet == 0 || _ceiling == 0 || _priceFactor == 0)
+         if (_wallet == 0 || _ceiling == 0 || _rateFactor == 0)
              // Arguments are null
              revert();
          owner = msg.sender;
          token = createTokenContract();
          wallet = _wallet;
          ceiling = _ceiling;
-         priceFactor = _priceFactor;
+         startTime = _startTime;
+         endTime = _endTime;
+         rateFactor = _rateFactor;
          stage = Stages.AuctionDeployed;
      }
-
 
 
      /// @dev Starts auction and sets startBlock
@@ -81,27 +83,6 @@ import '../ownership/Ownable.sol'
          atStage(Stages.AuctionDeployed)
      {
          stage = Stages.AuctionStarted;
-         startBlock = block.number;
-     }
-
-     /// @dev Calculates current token price
-     /// @return Returns token price
-     function calcCurrentTokenPrice()
-         public
-         returns (uint)
-     {
-         if (stage == Stages.AuctionEnded || stage == Stages.TradingStarted)
-             return finalPrice;
-         return calcTokenPrice();
-     }
-
-     /// @dev Returns correct stage, ehas not yet been called yet
-     /// @return Returns current auction stage
-     function updateStage()
-         public
-         onlyOwner
-     {
-         stage = Stages(uint(stage) + 1);
      }
 
      /*
@@ -125,7 +106,7 @@ import '../ownership/Ownable.sol'
          validPurchase()
          returns (uint amount)
      {
-         if(hasReachedEndBlock)
+         if(hasReachedEndBlock())
              finalizeAuction();
 
          receiver = msg.sender;
@@ -138,7 +119,7 @@ import '../ownership/Ownable.sol'
              // Send change back to receiver address.
              receiver.transfer(msg.value - amount);
          }
-         wallet.transfer(this.amount);
+         wallet.transfer(amount);
          bids[receiver] += amount;
          totalReceived = totalReceived + amount;
          if (maxWeiBasedOnTotalReceived == amount)
@@ -151,7 +132,7 @@ import '../ownership/Ownable.sol'
      /// @param receiver Tokens will be assigned to this address if set
      function claimTokens(address receiver)
          public
-         atStage(Stages.TradingStarted)
+         atStage(Stages.AuctionEnded)
      {
 
          receiver = msg.sender;
@@ -167,21 +148,12 @@ import '../ownership/Ownable.sol'
          public
          returns (uint)
      {
-         if(block.number <= endBlock){
-            return priceFactor * 10**18 / (block.number - startBlock + 10000) + 1;
+         if(block.timestamp <= endTime){
+            return rateFactor * 10**18 / (block.number - startTime + 10000) + 1;
          } else {
-            return priceFactor * 10**18 / (endBlock - startBlock + 10000) + 1;
+            return rateFactor * 10**18 / (endTime - startTime + 10000) + 1;
          }
 
-     }
-
-     /// @dev Allow to start trading period
-     function beginTradingPeriod()
-         public
-         onlyOwner
-         atStage(Stages.AuctionEnded)
-     {
-         stage = Stages.TradingStarted;
      }
 
      /*
@@ -203,6 +175,6 @@ import '../ownership/Ownable.sol'
      }
 
      function hasReachedEndBlock() internal returns(bool) {
-       return block.number > endBlock;
+       return block.timestamp > endTime;
      }
  }

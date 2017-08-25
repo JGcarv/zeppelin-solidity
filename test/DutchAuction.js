@@ -29,26 +29,54 @@ contract('Dutch Auction', (accounts) => {
     startTime = latestTime() + duration.weeks(1);
     endTime = startTime + duration.weeks(1);
 
-    dutchAuction = await DutchAuction.new(wallet, ceiling, rateFactor, startTime, endTime);
+    dutchAuction = await DutchAuction.new(wallet, ceiling);
     token = MintableToken.at(await dutchAuction.token())
   })
 
   it('should have deployed correctly', async ()  => {
-    assert.equal(await dutchAuction.wallet(), wallet);
     var cel = await dutchAuction.ceiling()
+    var stage = await dutchAuction.stage();
+    assert.equal(await dutchAuction.wallet(), wallet);
     assert.equal(cel.toNumber(), ceiling);
-    assert.equal(await dutchAuction.startTime(), startTime);
-    assert.equal(await dutchAuction.endTime(), endTime);
+    assert.equal(stage.toNumber(), 0);
   })
 
-  it('should avoid', async ()  => {
+  it('should setup auction correctly', async ()  => {
 
   })
-  it('should', async ()  => {
+
+  it('should start auction correctly', async ()  => {
 
   })
-  it('should', async ()  => {
+
+  it('should bid correctly with the Fallback function', async ()  => {
 
   })
+  it('should bid correctly in the low level bid function', async ()  => {
+
+  })
+  it('should end auction correctly when the ceiling is reached' , async ()  => {
+
+  })
+  it('should end auction correctly when the end time is reached' , async ()  => {
+
+  })
+
+  it('should calculate price correctly ' , async ()  => {
+
+  })
+
+  it('should calculate the final price correctly' , async ()  => {
+
+  })
+
+  it('should mint the correct amount of tokens' , async ()  => {
+
+  })
+
+  it('Bidders can claim the tokes correctly' , async ()  => {
+
+  })
+
 
 })

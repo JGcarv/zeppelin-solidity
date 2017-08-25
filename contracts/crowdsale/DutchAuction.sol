@@ -9,6 +9,8 @@ import '../ownership/Ownable.sol';
  * @notice Dutch Auction Crowdsale
  */
  contract DutchAuction is Ownable{
+
+     using SafeMath for uint256;
      /*
       *  Events
       */
@@ -20,9 +22,13 @@ import '../ownership/Ownable.sol';
      MintableToken public token;
      address public wallet;
      uint public ceiling;
-     uint public rateFactor;
+
      uint public startTime;
      uint public endTime;
+     uint public duration;
+     uint public inicialPrice;
+     uint public decreaseRate;
+
      uint public totalReceived;
      uint public finalPrice;
 
@@ -31,6 +37,7 @@ import '../ownership/Ownable.sol';
 
      enum Stages {
          AuctionDeployed,
+         AuctionSetup,
          AuctionStarted,
          AuctionEnded
      }
@@ -40,7 +47,6 @@ import '../ownership/Ownable.sol';
       */
      modifier atStage(Stages _stage) {
          if (stage != _stage)
-             // Contract not in expected state
              revert();
          _;
      }
@@ -51,39 +57,50 @@ import '../ownership/Ownable.sol';
        _;
      }
 
-
      /*
       *  Public functions
       */
      /// @dev Contract constructor function sets owner
      /// @param _wallet address Destination wallet
      /// @param _ceiling uint Auction ceiling
-     /// @param _rateFactor uint Auction price factor
-     function DutchAuction(address _wallet, uint _ceiling, uint _rateFactor, uint _startTime, uint _endTime)
+     function DutchAuction(address _wallet, uint _ceiling)
          public
      {
-         if (_wallet == 0 || _ceiling == 0 || _rateFactor == 0)
-             // Arguments are null
+         if (_wallet == 0 || _ceiling == 0)
              revert();
+
          owner = msg.sender;
          token = createTokenContract();
          wallet = _wallet;
          ceiling = _ceiling;
-         startTime = _startTime;
-         endTime = _endTime;
-         rateFactor = _rateFactor;
          stage = Stages.AuctionDeployed;
      }
 
 
-     /// @dev Starts auction and sets startBlock
-     function startAuction()
+     function setup(uint _duration, uint _inicialPrice, uint _decreaseRate)
          public
          onlyOwner
          atStage(Stages.AuctionDeployed)
-     {
-         stage = Stages.AuctionStarted;
-     }
+    {
+        if (_duration == 0 || _inicialPrice == 0 || _decreaseRate == 0)
+            revert();
+
+        duration = _duration;
+        inicialPrice = _inicialPrice;
+        decreaseRate = _decreaseRate;
+        stage = Stages.AuctionSetup;
+    }
+
+    /// @dev Starts auction and sets the duration
+    function startAuction()
+        public
+        onlyOwner
+        atStage(Stages.AuctionSetup)
+    {
+        startTime = now;
+        endTime = startTime + duration * 1 days;
+        stage = Stages.AuctionStarted;
+    }
 
      /*
       *  Fallback function
@@ -112,18 +129,16 @@ import '../ownership/Ownable.sol';
          receiver = msg.sender;
          amount = msg.value;
 
-         uint maxWeiBasedOnTotalReceived = ceiling - totalReceived;
-         // Only invest maximum possible amount
-         if (amount > maxWeiBasedOnTotalReceived) {
-             amount = maxWeiBasedOnTotalReceived;
-             // Send change back to receiver address.
+         uint maxBid = ceiling - totalReceived;
+         if (amount > maxBid) {
+             amount = maxBid;
              receiver.transfer(msg.value - amount);
          }
+
          wallet.transfer(amount);
          bids[receiver] += amount;
          totalReceived = totalReceived + amount;
-         if (maxWeiBasedOnTotalReceived == amount)
-             // When maxWei is equal to the big amount the auction is ended and finalizeAuction is triggered
+         if (maxBid == amount)
              finalizeAuction();
          BidSubmission(receiver, amount);
      }
@@ -148,10 +163,10 @@ import '../ownership/Ownable.sol';
          public
          returns (uint)
      {
-         if(block.timestamp <= endTime){
-            return rateFactor * 10**18 / (block.number - startTime + 10000) + 1;
+         if (block.timestamp <= endTime) {
+            return inicialPrice - decreaseRate * (block.timestamp - startTime);
          } else {
-            return rateFactor * 10**18 / (endTime - startTime + 10000) + 1;
+            return inicialPrice - decreaseRate * (endTime - startTime);
          }
 
      }

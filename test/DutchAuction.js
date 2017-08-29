@@ -1,6 +1,6 @@
 import ether from './helpers/ether'
 import {advanceBlock} from './helpers/advanceToBlock'
-import {increaseTimeTo, duration} from './helpers/increaseTime'
+import increaseTime from './helpers/increaseTime'
 import latestTime from './helpers/latestTime'
 import EVMThrow from './helpers/EVMThrow'
 
@@ -24,10 +24,7 @@ contract('Dutch Auction', (accounts) => {
 
   beforeEach(async () => {
     wallet = accounts[5];
-    ceiling = ether(1000);
-    rateFactor = 10000;
-    startTime = latestTime() + duration.weeks(1);
-    endTime = startTime + duration.weeks(1);
+    ceiling = ether(20);
 
     dutchAuction = await DutchAuction.new(wallet, ceiling);
     token = MintableToken.at(await dutchAuction.token())
@@ -42,32 +39,88 @@ contract('Dutch Auction', (accounts) => {
   })
 
   it('should setup auction correctly', async ()  => {
-
+    var iniPrice = web3.toWei(2, 'ether');
+    var decrRate = web3.toWei(0.0000033, 'ether');
+    await dutchAuction.setup(7, iniPrice, decrRate);
+    let stage = await dutchAuction.stage();
+    assert.equal(stage.toNumber(),1);
   })
 
   it('should start auction correctly', async ()  => {
-
+    var iniPrice = web3.toWei(2, 'ether');
+    var decrRate = web3.toWei(0.0000033, 'ether');
+    await dutchAuction.setup(7, iniPrice, decrRate);
+    await dutchAuction.startAuction();
+    let stage = await dutchAuction.stage();
+    assert.equal(stage.toNumber(),2);
   })
 
-  it('should bid correctly with the Fallback function', async ()  => {
-
+  it('should bid correctly', async ()  => {
+    var iniPrice = web3.toWei(2, 'ether');
+    var decrRate = web3.toWei(0.0000033, 'ether');
+    await dutchAuction.setup(7, iniPrice, decrRate);
+    await dutchAuction.startAuction();
+    let value = web3.toWei(10, 'ether');
+    web3.eth.sendTransaction({from:accounts[4], to:dutchAuction.address, value:value}, (err, txHase) => {
+      if(err){
+        console.log(err);
+      }
+    })
+    await dutchAuction.bid(accounts[3], {value: value});
+    let bid = await dutchAuction.bids(accounts[3]);
+    let bid2 = await dutchAuction.bids(accounts[4]);
+    assert.equal(bid.toNumber(), value);
+    assert.equal(bid2.toNumber(), value);
   })
-  it('should bid correctly in the low level bid function', async ()  => {
 
-  })
   it('should end auction correctly when the ceiling is reached' , async ()  => {
+    var iniPrice = web3.toWei(2, 'ether');
+    var decrRate = web3.toWei(0.0000033, 'ether');
+    await dutchAuction.setup(7, iniPrice, decrRate);
+    await dutchAuction.startAuction();
+    let value = web3.toWei(20, 'ether');
+    await dutchAuction.bid(accounts[3], {value: value});
+    let stage = await dutchAuction.stage();
+    assert.equal(stage.toNumber(),3);
 
   })
   it('should end auction correctly when the end time is reached' , async ()  => {
-
+    var iniPrice = web3.toWei(2, 'ether');
+    var decrRate = web3.toWei(0.0000033, 'ether');
+    await dutchAuction.setup(7, iniPrice, decrRate);
+    await dutchAuction.startAuction();
+    await dutchAuction.bid(accounts[4], {value: 1000000000000});
+    await increaseTime(721200);
+    await dutchAuction.bid(accounts[5], {value: 1000000000000});
+    let stage = await dutchAuction.stage();
+    assert.equal(stage.toNumber(),3);
   })
 
   it('should calculate price correctly ' , async ()  => {
-
+    var iniPrice = web3.toWei(2, 'ether');
+    var decrRate = web3.toWei(0.0000033, 'ether');
+    await dutchAuction.setup(7, iniPrice, decrRate);
+    await dutchAuction.startAuction();
+    let price1 = await dutchAuction.calcTokenPrice();
+    await increaseTime(100000);
+    let price2 = await dutchAuction.calcTokenPrice();
+    await increaseTime(400000);
+    let price3 = await dutchAuction.calcTokenPrice();
+    await increaseTime(200000);
+    let price4 = await dutchAuction.calcTokenPrice();
+    assert.isTrue(price1.toNumber() > price2.toNumber() && price2.toNumber() > price3.toNumber() && price3.toNumber() > price4.toNumber());
   })
 
   it('should calculate the final price correctly' , async ()  => {
-
+    var iniPrice = web3.toWei(2, 'ether');
+    var decrRate = web3.toWei(0.0000033, 'ether');
+    await dutchAuction.setup(7, iniPrice, decrRate);
+    await dutchAuction.startAuction();
+    await increaseTime(604900);
+    let price = await dutchAuction.calcTokenPrice();
+    let p1 = web3.fromWei(price.toNumber(), 'ether');
+    let p2 = 2 - (604800 * 0.0000033);
+    assert.equal(p1, p2.toFixed(5));
   })
 
   it('should mint the correct amount of tokens' , async ()  => {

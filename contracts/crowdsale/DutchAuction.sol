@@ -53,7 +53,11 @@ import '../ownership/Ownable.sol';
 
      modifier validPurchase() {
        require(msg.value > 0);
-       require(block.timestamp >= startTime && block.timestamp <= endTime);
+       require(block.timestamp >= startTime);
+       if(block.timestamp > endTime){
+         finalizeAuction();
+         return;
+       }
        _;
      }
 
@@ -108,12 +112,13 @@ import '../ownership/Ownable.sol';
      /// @dev If the auction is active, make a bid for msg.sender
      function()
          public
+         payable
      {
          if(stage != Stages.AuctionStarted)
            revert();
          bid(msg.sender);
      }
-
+     event Debug(uint pt);
      /// @dev Allows to send a bid to the auction
      /// @param receiver address Bid will be assigned to this address
      function bid(address receiver)
@@ -123,10 +128,12 @@ import '../ownership/Ownable.sol';
          validPurchase()
          returns (uint amount)
      {
-         if(hasReachedEndBlock())
-             finalizeAuction();
+         if(hasReachedEndBlock()) {
+           finalizeAuction();
+           return;
+         }
 
-         receiver = msg.sender;
+
          amount = msg.value;
 
          uint maxBid = ceiling - totalReceived;
@@ -179,6 +186,8 @@ import '../ownership/Ownable.sol';
      {
          stage = Stages.AuctionEnded;
          finalPrice = calcTokenPrice();
+         uint256 sta = uint(stage);
+         Debug(sta);
          // Crowdsale must be an authorized token minter
          token.mint(this, totalReceived / finalPrice + 1);
      }
@@ -190,6 +199,8 @@ import '../ownership/Ownable.sol';
      }
 
      function hasReachedEndBlock() internal returns(bool) {
+       Debug(block.timestamp);
+       Debug(endTime);
        return block.timestamp > endTime;
      }
  }

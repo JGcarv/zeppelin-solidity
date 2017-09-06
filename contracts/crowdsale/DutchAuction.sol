@@ -118,7 +118,8 @@ import '../ownership/Ownable.sol';
            revert();
          bid(msg.sender);
      }
-     event Debug(uint pt);
+
+     event Degu(uint bid);
      /// @dev Allows to send a bid to the auction
      /// @param receiver address Bid will be assigned to this address
      function bid(address receiver)
@@ -135,13 +136,11 @@ import '../ownership/Ownable.sol';
 
 
          amount = msg.value;
-
          uint maxBid = ceiling - totalReceived;
          if (amount > maxBid) {
              amount = maxBid;
              receiver.transfer(msg.value - amount);
          }
-
          wallet.transfer(amount);
          bids[receiver] += amount;
          totalReceived = totalReceived + amount;
@@ -151,16 +150,13 @@ import '../ownership/Ownable.sol';
      }
 
      /// @dev Claims tokens for bidder after auction
-     /// @param receiver Tokens will be assigned to this address if set
-     function claimTokens(address receiver)
+     function claimTokens()
          public
          atStage(Stages.AuctionEnded)
      {
-
-         receiver = msg.sender;
-         uint tokenCount = bids[receiver] * 10**18 / finalPrice;
-         bids[receiver] = 0;
-         token.transfer(receiver, tokenCount);
+         uint tokenCount = bids[msg.sender] / finalPrice + 1;
+         bids[msg.sender] = 0;
+         token.transfer(msg.sender, tokenCount);
      }
 
      /// @notice The price function calculates the token price in the current block.
@@ -186,8 +182,6 @@ import '../ownership/Ownable.sol';
      {
          stage = Stages.AuctionEnded;
          finalPrice = calcTokenPrice();
-         uint256 sta = uint(stage);
-         Debug(sta);
          // Crowdsale must be an authorized token minter
          token.mint(this, totalReceived / finalPrice + 1);
      }
@@ -199,8 +193,6 @@ import '../ownership/Ownable.sol';
      }
 
      function hasReachedEndBlock() internal returns(bool) {
-       Debug(block.timestamp);
-       Debug(endTime);
        return block.timestamp > endTime;
      }
  }

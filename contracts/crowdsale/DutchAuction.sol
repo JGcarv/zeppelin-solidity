@@ -134,7 +134,6 @@ import '../ownership/Ownable.sol';
            return;
          }
 
-
          amount = msg.value;
          uint maxBid = ceiling - totalReceived;
          if (amount > maxBid) {
@@ -149,12 +148,15 @@ import '../ownership/Ownable.sol';
          BidSubmission(receiver, amount);
      }
 
-     /// @dev Claims tokens for bidder after auction
+     /// @dev Claims tokens for bidder after auction.
      function claimTokens()
          public
          atStage(Stages.AuctionEnded)
      {
-         uint tokenCount = bids[msg.sender] / finalPrice + 1;
+         //Add in this equation the number of decimal places in your token.
+         // If the token has 10 ** 18, the token count becomes:
+         // tokenCount = bids[msg.sender] * 10 ** 18 / finalPrice + 1;
+         uint tokenCount = bids[msg.sender] * 10 ** 18 / finalPrice + 1;
          bids[msg.sender] = 0;
          token.transfer(msg.sender, tokenCount);
      }
@@ -183,7 +185,7 @@ import '../ownership/Ownable.sol';
          stage = Stages.AuctionEnded;
          finalPrice = calcTokenPrice();
          // Crowdsale must be an authorized token minter
-         token.mint(this, totalReceived / finalPrice + 1);
+         token.mint(this, totalReceived * 10 ** 18 / finalPrice + 1);
      }
 
      // creates the token to be sold.
